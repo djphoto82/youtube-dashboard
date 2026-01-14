@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube 4K Dashboard - BenQ SW271C</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card: #161616;
+            --accent: #ff0000;
+            --text: #ffffff;
+            --border: #333;
+        }
+
+        body {
+            margin: 0; padding: 25px;
+            background: var(--bg); color: var(--text);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            height: 100vh; display: flex; flex-direction: column;
+            box-sizing: border-box; overflow: hidden;
+        }
+
+        #dashboard {
+            display: grid;
+            grid-template-columns: 2800px 1fr; /* Fiksno za 4K */
+            gap: 30px; height: 100%;
+        }
+
+        .left-side { display: flex; flex-direction: column; gap: 20px; overflow: hidden; height: 100%; }
+
+        #player-wrap {
+            width: 100%; height: 1100px;
+            background: #000; border-radius: 15px; overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .controls-bar {
+            display: flex; gap: 20px; align-items: center;
+            padding: 15px; background: var(--card); border-radius: 12px;
+        }
+
+        /* 8 PLAYLIST OKENC */
+        .playlist-grid {
+            display: grid; 
+            grid-template-columns: repeat(4, 685px); /* Fiksna širina stolpcev */
+            grid-template-rows: repeat(2, 400px);    /* Fiksna višina vrst */
+            gap: 20px; 
+            flex-grow: 1;
+        }
+
+        .pl-box {
+            background: var(--card); border-radius: 12px;
+            padding: 15px; border: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            width: 685px; /* Prisilna širina */
+            box-sizing: border-box;
+        }
+
+        .pl-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 8px;
+        }
+
+        .pl-name { font-weight: bold; font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 450px; }
+
+        .video-list { 
+            flex-grow: 1; 
+            overflow-y: auto; /* Notranji drsnik */
+            font-size: 0.95rem; 
+        }
+
+        .v-item {
+            padding: 10px; border-bottom: 1px solid #222;
+            cursor: pointer; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .v-item:hover { color: #fff; background: #222; }
+
+        /* DESNI DEL: ISKANJE & FILTRI */
+        .search-side {
+            background: var(--card); border-radius: 15px;
+            padding: 20px; border: 1px solid var(--border);
+            display: flex; flex-direction: column; gap: 15px;
+            overflow: hidden; /* Glavni drsnik je znotraj results */
+        }
+
+        .filter-section {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;
+        }
+        .filter-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-btn {
+            background: #222; color: #ddd; border: 1px solid #444;
+            padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;
+        }
+        .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        #results { flex-grow: 1; overflow-y: auto; padding-right: 5px; }
+
+        .res-item {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding: 15px;
+            background: #1a1a1a; border-radius: 12px; min-height: 380px; /* Enotna višina */
+        }
+        .res-item img { width: 100%; border-radius: 8px; cursor: pointer; aspect-ratio: 16/9; object-fit: cover; }
+        
+        .btn {
+            background: #333; color: white; border: none;
+            padding: 12px 20px; border-radius: 8px; cursor: pointer;
+        }
+        .btn:hover { background: var(--accent); }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="dashboard">
+    <div class="left-side">
+        <div id="player-wrap"><div id="player"></div></div>
+
+        <div class="controls-bar">
+            <button class="btn" onclick="player.playVideo()">▶ Play</button>
+            <button class="btn" onclick="player.pauseVideo()">⏸ Pause</button>
+            <button class="btn" onclick="player.previousVideo()">⏮</button>
+            <button class="btn" onclick="player.nextVideo()">⏭</button>
+            <input type="range" min="0" max="100" value="50" onchange="player.setVolume(this.value)" style="width:200px">
+            <button class="btn" onclick="login()" id="loginBtn">🔐 Prijava</button>
+            <span id="status" style="font-size: 0.9rem; color: #888;">❌ Ni povezano</span>
+        </div>
+
+        <div class="playlist-grid" id="plGrid"></div>
+    </div>
+
+    <div class="search-side">
+        <div class="search-input-group" style="display:flex; gap:10px;">
+            <input type="text" id="sq" placeholder="Išči (Enter)..." style="flex-grow:1; background:#000; color:white; border:1px solid #333; padding:15px; border-radius:8px;">
+            <button class="btn" onclick="search()">Išči</button>
+        </div>
+
+        <div class="filter-section">
+            <span style="font-weight:bold; color:var(--accent);">FILTRI</span>
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="setSort('relevance', this)">Privzeto</button>
+                <button class="filter-btn" onclick="setSort('date', this)">Nazadnje dodano</button>
+                <button class="filter-btn" onclick="setSort('viewCount', this)">Najbolj priljubljeni</button>
+                <button class="filter-btn" onclick="setSort('long', this, true)">Trajanje (Dolgi)</button>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+</div>
+
+<script>
+    const API_KEY = "AIzaSyA_pC145cW0j79pJdvj3ek79WTkhB-trww";
+    const CLIENT_ID = "508122818593-g1hilfaj85gj78cd52r11s1j89kr1lsb.apps.googleusercontent.com";
+    
+    let currentSort = 'relevance';
+    let currentDuration = 'any';
+
+    let myPlaylists = [
+        { name: "Eva muzka", id: "PLdIGqVOOqRjyIPXr1L7XLxJFWsk0-RZh7" },
+        { name: "Eva - otroške pesmice", id: "PLdIGqVOOqRjwKyfQKlawmTTsTP_LnmsTH" },
+        { name: "Festa Petra (SLO)", id: "PLdIGqVOOqRjyC5IJcn2C97kZRQtSGAthr" },
+        { name: "Festa Petra (EX-YU)", id: "PLdIGqVOOqRjwFMJBZxkpQW1F95wLSpKWr" },
+        { name: "Festa Petra (EX-YU) - novo", id: "PLdIGqVOOqRjz_WMEgyB8uqrgx1swfSedB" },
+        { name: "Festa Petra (ostalo)", id: "PLdIGqVOOqRjy_Jei1fCrjLGWsfajDtoP8" },
+        { name: "Festa Petra (ostalo) - novo", id: "PLdIGqVOOqRjxvG1nyjybTHqxaujAJuufA" },
+        { name: "Festa Petra (Domače)", id: "PLdIGqVOOqRjymCCX1orA6kHUloHY3J2_T" }
+    ];
+
+    let player, accessToken, tokenClient;
+
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            height: '100%', width: '100%',
+            videoId: '', playerVars: { listType: 'playlist', list: myPlaylists[0].id }
+        });
+    }
+
+    function initPlaylistGrid() {
+        const grid = document.getElementById('plGrid');
+        grid.innerHTML = '';
+        myPlaylists.forEach((pl, index) => {
+            const box = document.createElement('div');
+            box.className = 'pl-box';
+            box.innerHTML = `
+                <div class="pl-header">
+                    <span class="pl-name" id="name-${index}">${pl.name}</span>
+                    <button class="btn" style="padding:4px 8px; font-size:0.8rem" onclick="toggleSelect(${index})">⟳</button>
+                </div>
+                <select class="hidden-select" id="sel-${index}" style="display:none; margin-bottom:10px;" onchange="changeSlot(${index}, this.value)">
+                    ${myPlaylists.map(p => `<option value="${p.id}" ${p.id === pl.id ? 'selected' : ''}>${p.name}</option>`).join('')}
+                </select>
+                <div class="video-list" id="list-${index}">Nalaganje...</div>
+            `;
+            grid.appendChild(box);
+            fetchVideos(pl.id, index);
+        });
+    }
+
+    async function fetchVideos(playlistId, index) {
+        // Povečano na 50 videov za drsnik
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${API_KEY}`);
+        const data = await res.json();
+        const cont = document.getElementById(`list-${index}`);
+        cont.innerHTML = '';
+        if (data.items) {
+            data.items.forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'v-item';
+                item.innerText = v.snippet.title;
+                item.onclick = () => player.loadVideoById(v.snippet.resourceId.videoId);
+                cont.appendChild(item);
+            });
+        }
+    }
+
+    function setSort(sort, btn, isDuration = false) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if(isDuration) {
+            currentSort = 'relevance';
+            currentDuration = 'long';
+        } else {
+            currentSort = sort;
+            currentDuration = 'any';
+        }
+        search();
+    }
+
+    async function search() {
+        const q = document.getElementById('sq').value;
+        if(!q) return;
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(q)}&type=video&order=${currentSort}&videoDuration=${currentDuration}&key=${API_KEY}`);
+        const data = await res.json();
+        const cont = document.getElementById('results');
+        cont.innerHTML = '';
+        data.items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'res-item';
+            div.innerHTML = `
+                <img src="${item.snippet.thumbnails.high.url}" onclick="player.loadVideoById('${item.id.videoId}')">
+                <div style="font-weight:bold; height:50px; overflow:hidden;">${item.snippet.title}</div>
+                <button class="btn" onclick="toggleSaveUI('${item.id.videoId}', this)">Shrani v playlisto</button>
+                <div class="save-ui" style="display:none; margin-top:10px;"></div>
+            `;
+            cont.appendChild(div);
+        });
+    }
+
+    // Iskanje na Enter
+    document.getElementById('sq').addEventListener('keypress', (e) => { if(e.key === 'Enter') search(); });
+
+    // Pomožne funkcije (OAuth, Save UI, etc.) so ostale enake...
+    function toggleSelect(i) {
+        const s = document.getElementById(`sel-${i}`);
+        s.style.display = s.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function changeSlot(i, newId) {
+        const nameSpan = document.getElementById(`name-${i}`);
+        nameSpan.innerText = myPlaylists.find(p => p.id === newId).name;
+        fetchVideos(newId, i);
+        toggleSelect(i);
+    }
+
+    function toggleSaveUI(vidId, btn) {
+        const uiDiv = btn.nextElementSibling;
+        if (uiDiv.style.display === 'block') { uiDiv.style.display = 'none'; return; }
+        uiDiv.innerHTML = '';
+        const sel = document.createElement('select');
+        sel.style.width = "100%"; sel.style.padding = "10px";
+        myPlaylists.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id; opt.textContent = p.name; sel.appendChild(opt);
+        });
+        const newOpt = document.createElement('option');
+        newOpt.value = "CREATE_NEW"; newOpt.textContent = "+ Ustvari novo...";
+        sel.appendChild(newOpt);
+        
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = "btn"; confirmBtn.style.width = "100%"; confirmBtn.style.marginTop = "5px";
+        confirmBtn.innerText = "Potrdi";
+        confirmBtn.onclick = async () => {
+            if (sel.value === "CREATE_NEW") {
+                const newTitle = prompt("Ime nove playliste:");
+                if (newTitle) {
+                    const nid = await createNewPlaylist(newTitle);
+                    if (nid) { await addToPlaylist(vidId, nid); myPlaylists.push({name:newTitle, id:nid}); initPlaylistGrid(); }
+                }
+            } else { await addToPlaylist(vidId, sel.value); }
+            uiDiv.style.display = 'none';
+        };
+        uiDiv.appendChild(sel); uiDiv.appendChild(confirmBtn);
+        uiDiv.style.display = 'block';
+    }
+
+    async function createNewPlaylist(title) {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,status", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ snippet: { title: title }, status: { privacyStatus: "public" } })
+        });
+        const data = await res.json();
+        return res.ok ? data.id : null;
+    }
+
+    async function addToPlaylist(vId, pId) {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ snippet: { playlistId: pId, resourceId: { kind: "youtube#video", videoId: vId }}})
+        });
+        if(res.ok) alert("Dodano!");
+    }
+
+    function initOAuth() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube",
+            callback: (res) => { accessToken = res.access_token; document.getElementById("status").innerText = "✅ Povezano"; }
+        });
+    }
+    function login() { tokenClient.requestAccessToken(); }
+    
+    window.onload = () => { initOAuth(); initPlaylistGrid(); };
+</script>
+</body>
+</html>
