@@ -166,10 +166,10 @@ onchange="player.setVolume(this.value)">
         player = new YT.Player('player', {
             height: '100%',
             width: '100%',
-            videoId: '',
             playerVars: {
                 listType: 'playlist',
                 list: myPlaylists[0].id,
+				index: 0,
                 autoplay: 1
             },
             events: {
@@ -228,7 +228,7 @@ onchange="player.setVolume(this.value)">
             const item = document.createElement('div');
             item.className = 'v-item';
             item.innerHTML = `
-                <div class="v-title" onclick="player.loadVideoById('${v.snippet.resourceId.videoId}')">${v.snippet.title}</div>
+                <div class="v-title" onclick="player.playVideoAt(${items.indexOf(v)})">${v.snippet.title}</div>
                 <div class="v-actions">
                     <button class="btn-mini" onclick="openMoveMenu(event, '${v.id}', '${v.snippet.resourceId.videoId}', '${playlistId}', '${v.snippet.title.replace(/'/g,"")}')">M</button>
                     <button class="btn-mini" onclick="deleteVideo('${v.id}', '${playlistId}', '${v.snippet.title.replace(/'/g,"")}')">X</button>
