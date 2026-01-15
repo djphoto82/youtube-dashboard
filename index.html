@@ -21,7 +21,7 @@
         .btn:hover { background: var(--accent); }
 
         .playlist-grid { display: grid; grid-template-columns: repeat(4, 660px); grid-template-rows: repeat(2, 480px); gap: 30px; flex-grow: 1; }
-        .pl-box { background: var(--card); border-radius: 12px; padding: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; width: 660px; }
+        .pl-box { background: var(--card); border-radius: 12px; padding: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; width: 650px; }
         
         .pl-header { display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 8px; }
         .pl-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
@@ -56,9 +56,38 @@
         .btn-mini { padding: 4px 6px; font-size: 0.75rem; background: #444; border-radius: 4px; border: none; color: white; cursor: pointer; line-height: 1; }
         .btn-mini:hover { background: var(--accent); }
 
-        .video-list::-webkit-scrollbar { width: 4px; }
-        .video-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        .video-list::-webkit-scrollbar { width: 10px; }
+        .video-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.04); border-radius: 10px; }
         .video-list::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+        
+        /* === VOLUME SLIDER FIX === */
+        #volSlider {
+            width: 170px;
+            height: 28px;
+            cursor: pointer;
+        }
+
+        /* Chrome / Edge */
+        #volSlider::-webkit-slider-runnable-track {
+            height: 10px;
+        }
+
+        #volSlider::-webkit-slider-thumb {
+            height: 20px;
+            width: 20px;
+            margin-top: -5px;
+        }
+
+        /* Firefox */
+        #volSlider::-moz-range-track {
+            height: 10px;
+        }
+
+        #volSlider::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+        }        
+        
     </style>
 </head>
 <body>
@@ -70,7 +99,9 @@
             <button class="btn" onclick="togglePlay()">▶ Play/Pause</button>
             <button class="btn" onclick="player.previousVideo()">⏮</button>
             <button class="btn" onclick="player.nextVideo()">⏭</button>
-            <input type="range" min="0" max="100" value="50" id="volSlider" onchange="player.setVolume(this.value)">
+            <input type="range" min="0" max="100" value="50" id="volSlider"
+style="width:1400px; height:40px;"
+onchange="player.setVolume(this.value)">
             <button class="btn" onclick="login()">🔐 Prijava</button>
             <span id="status" style="font-size: 0.8rem; color: #666;">❌ Ni povezano</span>
         </div>
@@ -132,7 +163,26 @@
     let currentSort = 'relevance', currentDuration = 'any';
 
     function onYouTubeIframeAPIReady() {
-        player = new YT.Player('player', { height: '100%', width: '100%', videoId: '', playerVars: { listType: 'playlist', list: myPlaylists[0].id } });
+        player = new YT.Player('player', {
+            height: '100%',
+            width: '100%',
+            videoId: '',
+            playerVars: {
+                listType: 'playlist',
+                list: myPlaylists[0].id,
+                autoplay: 1
+            },
+            events: {
+                onStateChange: onPlayerStateChange
+            }
+        });
+    }
+
+    function onPlayerStateChange(event) {
+        console.log("STATE:", event.data);
+        if (event.data === YT.PlayerState.ENDED) {
+            player.nextVideo();
+        }
     }
 
     function togglePlay() { player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo(); }
@@ -345,7 +395,7 @@
                     <div class="pl-top-row">
                         <span class="pl-title-area">${pl.name} <span id="count-${index}" style="color:var(--accent)">(...)</span></span>
                         <div class="sort-btns" id="sort-${index}">
-                            <button class="btn-sort ${sortModes[pl.id] === 'date' ? 'active' : ''}" id="sort-date-${index}" onclick="setSortPL('${pl.id}', ${index}, 'date')">Nov.</button>
+                            <button class="btn-sort ${sortModes[pl.id] === 'date' ? 'active' : ''}" id="sort-date-${index}" onclick="setSortPL('${pl.id}', ${index}, 'date')">Zadnji dodani</button>
                             <button class="btn-sort ${sortModes[pl.id] === 'abc' ? 'active' : ''}" id="sort-abc-${index}" onclick="setSortPL('${pl.id}', ${index}, 'abc')">ABC</button>
                         </div>
                         <div class="pl-actions">
